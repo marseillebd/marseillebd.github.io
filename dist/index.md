@@ -1,5 +1,3 @@
-# Marseille Bouchard Demko
-
 I am a passionate, conscientious programmer.
 I value reliability at all levels of software development.
 I try to understand my software down to the machine so that I can make informed decicions about the engineering implications.
