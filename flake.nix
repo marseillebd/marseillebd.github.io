@@ -22,6 +22,7 @@
         buildInputs = with pkgs; [
           just # for a justfile that holds common commands
           pandoc # to generate html from markdown
+          typos # to spellcheck my writing
         ];
         shellHook = ''
           . .profile.sh

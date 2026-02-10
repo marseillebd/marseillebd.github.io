@@ -1,0 +1,111 @@
+# Compiler Tools
+
+For a long time, I have had a deep love of programming language design and implementation.
+At this point, I have a good grasp on the formal analysis of languages:
+    how their interface allows (or does not allow) certain forms of complexity to grow within a codebase.
+However, ergonomic principles are not so easily analysed.
+There's nothing for it but to build the system and see if it holds up.
+I've certainly built my share of toy implementations to experiment with languages,
+    but the ergonomic experiment is always cut short by the limitations of using a toy.
+The best way to investigate a language is to have a serious development environment.
+
+I am working on a suite of compiler tools meant to ease the development of serious experimental language implementations.
+What exactly does this entail? It's a shifting target but here's what I have in mind for now:
+
+## Uniform, Familiar Syntax
+
+Almost none of the interesting design decisions are about the language's syntax.
+I want to select an ergonomic syntax and never write a parser again.
+
+Parser generators certainly are one option.
+However, they are difficult to maneuver into [good error reporting and recovery](#excellent-error-messages).
+They also have quite a few limitations on how context-sensitivity is expressed.
+
+I have historically preferred writing parsers by-hand with combinator libraries.
+However, I have found these to be fiddly.
+When first creating a parser, one must carefully thing about input consumption and backtracking,
+    lest the parser begins failing with unexpected and inexplicable errors.
+Also, the combinators built are not modular.
+The order of combination makes the difference to correctness.
+They cannot be reused between languages without forethought and ensuing complexity.
+They are difficult to modify, precicely because the control flow is so intricate.
+
+S-expressions offer a way to bypass the troubles of parsing entirely.
+However, while _I_ am very familiar with Lisp, few others are.
+Using s-expressions undercuts the ergonomic demonstration with their lack of familiarity.
+Yes, familiarity is a part of ergonomics, for better or worse.
+
+The advantage of using an s-expression approach is that they can be parsed with much the same ease as JSON.
+Consider how geographic data can be encoded into JSON and later extracted.
+The consumer need not worry about the details of parsing, but merely needs to traverse the JSON object tree top-down,
+    according to the GeoJSON spec, either validating or transforming into more efficient internal representation.
+This same approach can allow for easy encoding and decoding of any tree-like data, including syntax trees.
+
+Of course, actually programming in JSON directly is quite cumbersome.
+I've done it before (to provide rules to a network performance monitor), but writing the rules was quite painful.
+JSON simply lacks the conveniences of everyday programming language syntax, such as dotted member access and function calls.
+If I had to do it again, I would use [Common Expression Language](https://cel.dev/) (CEL).
+Unfortunately, while CEL provides great inspiration, it only addresses expressions.
+A full syntax must be able to express blocks of statements, declarations/definitions, and modules, at the very least.
+
+The solution I have in mind simply does not yet exist (to my knowledge).
+Therefore, I am writing one: [Common Concrete Syntax](https://github.com/marseillebd/compiler-tools/blob/main/common-concrete-syntax/docs/STANDARD-ccs.md) (CCS).
+The idea is to blend the best of uniform data formats (JSON, s-expressions) with the familiarity of modern syntax (algol-like).
+
+One controversial design choice I've made is that CCS is indentation-sensitive.
+In my opinion, indentation-sensitivity is familiar: it is also present in markdown, and on centuries-old paper, such as in nested lists.
+Further, enforced block structure allows for easier and more accurate skimming, which I think should be prized in language design.
+In other languages, unusual indentation (and lack of adequate linting tools) can be the source of bugs like the infamous [goto fail](https://www.cve.org/CVERecord?id=CVE-2014-1266).[^gotofail]
+There is some push-back from programmers that indentation-sensitivity gets in the way of formatting code the best way.
+Code formatting does not help solve problems, and it has no accepted meaning beyond nesting structure.
+
+[^gotofail]: In iOS circa 2014, the TLS implementation was faulty, allowing man-in-the-middle attacks.
+The fix was a single-line diff; see if you can spot it, and how indentation-sensitivity could have mitigated the impact.
+
+    ```
+    if ((err = SSLHashSHA1.update(&hashCtx, &serverRandom)) != 0)
+        goto fail;
+    if ((err = SSLHashSHA1.update(&hashCtx, &signedParams)) != 0)
+        goto fail;
+        goto fail;
+    if ((err = SSLHashSHA1.final(&hashCtx, &hashOut)) != 0)
+        goto fail;
+    ```
+
+## Excellent Error Messages
+
+Error messages must be accurate and justified.
+With a verifiable reason why the error was generated, it can be easy to fix most errors.
+When experimenting with a new language implementation, lack of a reason can lead to doubt in the implementation.
+Perhaps the implementation even is wrong, but a detailed reason can be disproved more easily, leading to more accurate assessment of the implementation bug.
+
+I don't have much in the way of software tools for this, but I do have a technique.
+Simply put, every error gets its own constructor that describes the reason.
+Then, even if the error messages are rendered with auto-generated debug printing, there is still a clear reason.
+
+Additionally, location tracking is paramount throughout the compiler.
+What location tracking libraries do exist are often tied up as a small part of a larger library (such as GHC or the LSP protocol),
+    and/or are incapable of tracking full information data.
+I'm working on [a library](https://github.com/marseillebd/compiler-tools/tree/main/source-location) for that.
+Unfortunately, it is still very much a work in progress.
+Some issues I wish to solve are:
+- point-like positions vs spans
+- track byte offsets, because software disagrees on what columns are
+- not all locations are within file, eg input can come from stdin
+- not all locations can be identified within an input stream, eg code generated by macro expansion may not have clear location information
+- facilities to perform basic string manipulations with location tracking
+
+## Inspectability
+
+Fixing bugs in any stage of the language implementation is significantly aided by a detailed report of input/output for that stage.
+Of course, every stage has the potential for bugs, so every stage needs excellent output.
+Additionally, having access to these stages can be helpful for less-well-travelled code paths, such as linting or exact printing in error messages.
+
+Of particular interest to me is printing proof trees.
+Proof trees are exactly what a type checker (or inferencer) construct, but I usually do not have access to them as a programmer.
+When the type system is complex (as is often the case for sophisticated, ergonomic type systems),
+    it can be difficult to understand why certain proofs are impossible.
+Having direct access to the type checker's reasoning should be helpful in clearing up the issue,
+    regardless of whether it was a true type error, or a bug in the type checker.
+
+## Network of Small, Intelligible Stages

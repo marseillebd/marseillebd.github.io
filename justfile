@@ -6,6 +6,7 @@ default: build
 build:
   #!/usr/bin/env bash
   set -euo pipefail
+  typos src/*.md
   for md in src/*.md; do
     html="$(basename "${md%.md}.html")"
     # TODO skip building html that is newer than the corresponding md
@@ -13,6 +14,7 @@ build:
     pandoc \
       --lua-filter="assets/meta-from-md.lua" \
       --template="assets/page.html" \
+      --from=gfm+footnotes \
       "$md" -o "build/$html"
     printf >&2 "OK %s --> %s\n" "build/$html" "docs/$html"
     mv "build/$html" "docs/$html"
