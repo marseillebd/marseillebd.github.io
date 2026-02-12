@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="date" content='2026-02-12'>
+    <title>An Informal Type-Theoretic Analysis of Interfaces for
+Resource Acquisition and Release</title>
+  </head>
+  <body>
+    <h1
+    id="an-informal-type-theoretic-analysis-of-interfaces-for-resource-acquisition-and-release">An
+    Informal Type-Theoretic Analysis of Interfaces for Resource
+    Acquisition and Release</h1>
+    <p>Despite the pretentious title, I'm really talking about manual
+    memory management vs garbage collection. The lessons learned in
+    memory management do apply to other forms of resources, though, such
+    as locks or database connections or VBAs and so on.</p>
+    <p>The answer is "it depends". Absolute shocker that it's the same
+    answer as everywhere else in computer science. Sure, we can spend a
+    lot of time mapping out the conditions that indicate one or the
+    other choice, but that's not what I'm interested in here. The fact
+    is, whatever decision procedure we find is likely to produce wrong
+    answers, and even more relevant: <strong>developers consistently
+    fail to predict requirements</strong>. Realistically, the
+    requirements change under our feet and we have to adapt.</p>
+    <p>So what's the problem? We own the code, so we can swap from
+    manual to managed memory and vice-versa, right? In any serious body
+    of code, that turns out to be a lot of effort. You are locked-in
+    once you make the decision. The one thing I will map out is that at
+    the start of a project it seems like managed memory is the way to go
+    because it gets prototypes out the door quickly, but then managed
+    memory becomes a performance bottleneck as load increases. Worse,
+    even if you do change all your own code, your dependencies have
+    already made their choices, so you may have to rework your entire
+    software stack.</p>
+    <h2 id="naive-allocator-polymorphism">Naive
+    Allocator-Polymorphism</h2>
+    <p>So, what we need are interfaces that are allocator-polymorphic,
+    right? Just inject the allocator as a dependency. To be concrete,
+    let's consider the interface for a element-polymorphic dynamic array
+    in pseudo-C. I'm only going to address a fraction of the external
+    interface; the rest is immaterial and you can fill it in.</p>
+    <pre><code>declare type dynarr&lt;elem_t&gt;;
+
+size_t length(DynArr&lt;elem_t&gt;);
+elem_t index(DynArr&lt;elem_t&gt;, size_t i);
+void append(DynArr&lt;elem_t&gt;, elem_t);</code></pre>
+    <p>So far so good, but we have no way to construct a dynamic array.
+    If we weren't being allocator-polymorphic, we'd just use
+    <code>malloc</code> under the hood, but that locks-in our memory
+    management strategy. Instead, we need to inject the allocator as a
+    dependency. Since we'll be doing this all over the code base, we may
+    as well write the allocator intrerface once.</p>
+    <pre><code>struct Allocator {
+    alloc: fn&lt;T&gt;(size_t count) -&gt; ptr&lt;T&gt;;
+    free: fn&lt;T&gt;(ptr&lt;T&gt;) -&gt; void;
+};</code></pre>
+    <p>Although this interface looks like it is for manual management,
+    it can be re-used for automatic management by simply initializing
+    <code>free</code> to a no-op. Now, we just need to supply an
+    allocator to each dynamic array we create. Here, we do this with an
+    explicit argument for familiarity, but there are well-known
+    techniques to <em>infer</em> this argument, so the ergonomics remain
+    comfortable.</p>
+    <pre><code>DynArr&lt;elem_t&gt; new(Allocator);
+DynArr&lt;elem_t&gt; delete(Allocator);</code></pre>
+    <p>Now, I just have a few questions:</p>
+    <ul>
+    <li>Can the result of indexing be copied? Can it be aliased?</li>
+    <li>If I append, do I need to free later, or does the array take
+    ownership?</li>
+    <li>If an element has an alias before it is appended, is that alias
+    still valid after the array is free'd?</li>
+    </ul>
+    <p>If we attempt to use this interface in both managed and unmanaged
+    contexts, we need to be conservative with our answers. That means we
+    need to treat this array as manually-managed, thus erasing the
+    clarity<a href="#fn1" class="footnote-ref" id="fnref1"
+    role="doc-noteref"><sup>1</sup></a> advantage of a managed approach.
+    Perhaps it is no wonder that many programers who have had to write
+    manually-managed code discount garbage collection seemingly
+    out-of-hand. Attempts to create interfaces that can swap out
+    allocators from manual to automatic and vice-versa fail.</p>
+    <p>By the way, the interface mismatch is not limited to
+    garbage-collection. Polymorphisim between manual management and
+    scratch allocators have the same issues.</p>
+    <h2 id="type-theoretic-analysis">Type-Theoretic Analysis</h2>
+    <p>The question for anyone waking along this line of thought is
+    <strong>why did the solution fail even though the interface looked
+    good?</strong> From a type-theoretic perspective, the answer is
+    simple: <strong>our type system does not capture what it means to do
+    memory management correctly.</strong> That's not a fundamental limit
+    of type systems, however. So-called linear types are well-known to
+    model and check for correct resource management. Memory is just
+    another resource.</p>
+    <p>In our hypothetical type system, each variable will not only be
+    equipped with a type, but also a <em>quantity</em>. For simplicity,
+    quantity will come in two forms "unrestructed" (written
+    <code>*</code>) and "linear" (written <code>1</code>). Any time we
+    give an ordinary type, we'll also give the quantity just before the
+    type. Unrestricted quantity is what you are used to: you can "use"
+    the variable as many times as you like, including not at all. Linear
+    quantity variables require you to "use" that variable exactly once.
+    (Readers already familiar with linear types will note that my
+    presentation differs from the usual implementation, but I find the
+    usual implementation to require knowledge of continuation passing,
+    and I'd rather not have another dependency on this already niche
+    article.)</p>
+    <p>But what the heck does "using" mean? Of course, not only
+    variables, but also function parameters and return values will be
+    equipped with quantity, and this is where "quantity" gains a
+    meaning. If a function returns a linear value, the caller is
+    responsible for "cleaning up" that return value, perhaps
+    <code>free</code> or <code>fclose</code> or whatever. If a function
+    takes a linear parameter, then it promises to clean up that value.
+    Note, the cleanup may not be direct: a function receiving a linear
+    parameter might pass it back as a return value, which is called a
+    "borrow". This is the heart of the "linear types model resources"
+    slogan. All we have to do is write interfaces that specify the
+    allocation and deallocation, and the type system makes sure the rest
+    of the code is doing the bookkeeping correctly.</p>
+    <h3 id="manual-memory-management">Manual Memory Management</h3>
+    <p>So, let's consider the interface for manual memory management
+    again. We need a function that allocates memory, and for which the
+    caller is responsible for making sure cleanup happens. We also need
+    a function that deallocates that same memory, which does the
+    cleanup. This means we'll be creating/destroying a <em>linear</em>
+    pointer. We'll also need to read/write with this pointer, which we
+    can do with borrows.</p>
+    <pre><code>1 ownptr&lt;T&gt; manAlloc();
+manFree(1 ownptr&lt;T&gt;);
+
+(T, 1 ownptr&lt;T&gt;) read&lt;T&gt;(1 ownptr&lt;T&gt;);
+1 ownptr&lt;T&gt; write(1 ownptr&lt;T&gt;, T);
+
+int main() {
+    1 ownptr&lt;int&gt; ecPtr = manAlloc();
+    ecPtr = write(ecPtr, 0);
+
+    // ... anything goes, as long as we don&#39;t call `free(ecPtr)` in here
+
+    ec, ecPtr = read(ecPtr);
+    manFree(ecPtr);
+    // ^ not including this line will cause a compiler error, because you forgot to free the pointer you allocated
+
+    // read(ecPtr); // this line would fail to compile because it&#39;s a use-after-free
+    // manFree(ecPtr); // this line would fail to compile because it&#39;s a double-free
+
+    return ec;
+}</code></pre>
+    <p>In practice, constantly re-assigning the same resource to the
+    same variable a bunch is annoying. So for convenience, there is
+    usually a special syntax for borrowing, which I'll show as well.</p>
+    <pre><code>T read&lt;T&gt;(&amp; ownptr&lt;T&gt;);
+void write(&amp; ownptr&lt;T&gt;, T);
+
+int main() {
+    1 ownptr&lt;int&gt; ecPtr = malloc();
+    write(ecPtr, 0);
+
+    // ... anything goes, as long as we don&#39;t call `free(ecPtr)` in here
+
+    ec = read(ecPtr);
+    free(ecPtr);
+
+    return ec;
+}</code></pre>
+    <p>Under the hood, <code>manAlloc</code>, <code>manFree</code>,
+    <code>read</code> and <code>write</code> will have to
+    cast/convert/unwrap the abstract <code>ownptr</code> resource into
+    an ordinary <code>uintptr_t</code> value. However, if we keep the
+    internal representation of <code>ownptr</code> abstract --- basic
+    encapsulation --- then we gain a significant advantage. To verify
+    our program does not crash as a result of using
+    <code>manAlloc</code>'d memory, all we have to do is the small task
+    of verifying the core implementation, and then the type check does
+    the rest automatically, no matter how large or complex our program
+    gets.</p>
+    <p>By the way, I've heard expert C programmers dismiss this property
+    of Rust code because they can and do write memory-safe code in C all
+    the time. Yes, of course you can write memory-safe code in C, but if
+    you want to <em>verify</em> your code to be memory-safe, you have to
+    do a lot of work. Even tools like address sanitization or valgrind
+    which speed up the process still take <em>ages</em> to run compared
+    to the Rust compiler.</p>
+    <h3 id="automatic-memory-management">Automatic Memory
+    Management</h3>
+    <p>With garbage collection, you allocate, but you need not worry
+    about freeing, or any of the related bookkeeping. You are trusting
+    the collector to do an adequate job itself, and in many if not most
+    cases it can. The advantage is not just that the interface need not
+    have <code>free</code>, but it also need not use linear types.</p>
+    <pre><code>gcptr&lt;T&gt; gcAlloc();
+
+T read&lt;T&gt;(gcptr&lt;T&gt;);
+void write(gcptr&lt;T&gt;, T);
+
+int main() {
+    gcptr&lt;int&gt; ecPtr = gcAlloc();
+    ecPtr = write(ecPtr, 0);
+
+    // ... anything goes, actually anything this time
+
+    ec = read(ecPtr);
+
+    // never had to remember to call anything, much less exactly once, nor at any particular time
+    // that reduces cognitive overhead, leaving room for solving other problems
+    return ec;
+}</code></pre>
+    <p>This interface is very boring --- which is the point --- so
+    there's not much to talk about here. Keen readers might recognize
+    one issue with this interface, which I'll get into below. For now,
+    I'll simply put the interfaces side-by-side so that we can see
+    exactly the differences and similarities. Of course, we see the gap
+    for <code>gcFree</code>, but as already noted, a simple no-op can
+    stand-in. The only other difference is that the pointers manipulated
+    in each interface differ in their linearity. I think you can see how
+    this would have dramatic implications for variable use and control
+    flow, even though C-like type systems cannot capture it.</p>
+    <pre><code>1 ownptr&lt;T&gt; manAlloc();               gcptr&lt;T&gt; gcAlloc();
+            manFree(1 ownptr&lt;T&gt;);
+T           read&lt;T&gt;(&amp; ownptr&lt;T&gt;);     T        read&lt;T&gt;(gcptr&lt;T&gt;);
+void        write(&amp; ownptr&lt;T&gt;, T);    void     write(gcptr&lt;T&gt;, T);</code></pre>
+    <p>This answers why the naive interface dose not work in practice,
+    but that wasn't our original question. Remember, we want to build a
+    system with one form of memory management while being able to switch
+    to the other.</p>
+    <h2 id="migrating-between-manual-and-automatic-management">Migrating
+    Between Manual and Automatic Management</h2>
+    <p>I'm not sure there is a common interface (that's at all easy to
+    explain or use) where you can simply inject either sort of
+    allocator. So long allocator-polymorphic data structures; we'll have
+    to provide separate implementations for all the data structures we
+    want to swap between. Then, we'll need to be able to move memory
+    between the manual and automatic worlds.</p>
+    <p>Moving data from manual management to automatic is simple. The
+    garbage collector simply takes ownership of the raw pointer, and is
+    instructed to cleanup with a finalizer. This is already
+    well-implemented in any language that has garbage collection.</p>
+    <p>Working with managed memory from a manually-managed language is
+    much less well-known. Something that makes garbage collection so
+    pleasant to work with is that they are generally supported by a
+    runtime that can trace the registers and stack for any references to
+    managed memory. In a language such as C, there is no such support,
+    so while we might be able to automatically manage memory, we still
+    need to manually manage the <em>root set</em>. This root set is the
+    missing part of the <code>gcAlloc</code> interface I mentioned
+    previously.</p>
+    <pre><code>(gcptr&lt;T&gt;, 1 gcRoot) gcAlloc();
+void gcUnroot(1 gcRoot);
+
+T read&lt;T&gt;(gcptr&lt;T&gt;);
+void write(gcptr&lt;T&gt;, T);
+
+int main() {
+    gcptr&lt;int&gt; ecPtr, gcRoot root = gcAlloc();
+    ecPtr = write(ecPtr, 0);
+
+    // ... anything goes, actually anything this time
+
+    ec = read(ecPtr);
+    gcUnroot(root);
+    // ^ this is the optimal place to unroot, since ecPtr isn&#39;t used again after this point
+
+    return ec;
+}</code></pre>
+    <p>The above interface is the least sophisticated way of managing gc
+    roots. Thankfully, managing a rootset is much simpler than managing
+    pointers, as roots tend to go out of scope as soon as (or before) a
+    function returns. In fact, for most purposes it is probably
+    sufficient to use a stack of scratch allocators for roots.</p>
+    <p>If I'm honset, we're well into my musings at this point. There
+    are definite constraints on the lifetime of the root vs the
+    <code>gcptr</code> that we obtained. Also, a moving garbage
+    collector might invalidate a <code>gcptr</code> if it's implemented
+    as a simple pointer. There's certainly an argument to be made that
+    unmanaged code should only be able to access managed memory through
+    roots. Less strict APIs may be possible, but characterizing
+    (designing, reading, and using) is certainly a more difficult
+    problem. Perhaps a rank-2 type may be able to let us read
+    type-level-tagged pointers from a single root without allowing those
+    pointers to escape where the root is known to be valid, while not
+    requiring constant modification to the rootset.</p>
+    <h2 id="conclusion">Conclusion</h2>
+    <p>I certainly haven't solved the problem of safely embedding a
+    garbage collector into an unmanaged language. I want to, though, and
+    hopefully in an ergonomic and efficient way. Embedded scripting
+    languages are similar, but they have constrained patterns of
+    data-sharing: the script calls a primitive or the runtime invokes a
+    scripted callback. What I am looking for is a <em>library</em> I can
+    use in an unmanaged context which allows me to use managed
+    resources, no matter the complexity of the data sharing between the
+    managed and unmanaged heaps. I believe that would offer a smoother
+    transition from managed to unmanaged memory: simply start in an
+    unmanaged language using that library, and then swap out components'
+    allocation strateies as needed, at the cost of managing a
+    rootset.</p>
+    <section id="footnotes" class="footnotes footnotes-end-of-document"
+    role="doc-endnotes">
+    <hr />
+    <ol>
+    <li id="fn1"><p>"Clarity" is a vague word. What I mean is that
+    garbage collection separates out the often boring details of memory
+    management from the interesting logical/buissiness problem that we
+    are writing, and especially, later reading.<a href="#fnref1"
+    class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+    </ol>
+    </section>
+    <footer>
+      <hr/>
+      <p>last edited: 12 February 12026 HE</p>
+    </footer>
+  </body>
+</html>

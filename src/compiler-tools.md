@@ -28,7 +28,7 @@ When first creating a parser, one must carefully thing about input consumption a
 Also, the combinators built are not modular.
 The order of combination makes the difference to correctness.
 They cannot be reused between languages without forethought and ensuing complexity.
-They are difficult to modify, precicely because the control flow is so intricate.
+They are difficult to modify, precisely because the control flow is so intricate.
 
 S-expressions offer a way to bypass the troubles of parsing entirely.
 However, while _I_ am very familiar with Lisp, few others are.
