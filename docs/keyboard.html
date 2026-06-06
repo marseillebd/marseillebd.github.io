@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+
+<!---------------->
+<!------ CSS ----->
+<!---------------->
+
+<style>
+@import url('ancient-sans-font/misc/Ancientsans-Jp9Pn.ttf');
+body {
+  font-family: "Ancient Sans", monospace;
+}
+</style>
+
+<style>
+table {
+  border-collapse: collapse;
+}
+
+td {
+  text-align: center;
+  border: thin lightgrey solid;
+}
+</style>
+
+<!--------------->
+<!------ JS ----->
+<!--------------->
+<script>
+
+<!------ Library ------>
+
+function _live(root, selector, eventType, callback) {
+  // normalize optional args
+  if (callback === undefined) { callback = eventType; eventType = selector; selector = root; root = document }
+  // BODY
+  const listenHandle = root.addEventListener(eventType, (evt) => {
+    elem = evt.target || evt.srcElement
+    while (elem && elem.matches) {
+      if (elem.matches(selector)) {
+        // TODO I should probably think about propagation
+        return callback.call(elem, evt)
+      }
+      elem = elem.parentNode
+    }
+  })
+  return listenHandle // TODO this is returned so you can remove listeners, but do I need to adapt it at all?
+}
+
+<!------ Hardcoding ------>
+
+const keeb = {
+  // stops
+  tr: { text: "ʈ", },
+  dr: { text: "ɖ", },
+  "voiced-palatal-stop": { text: "ɟ", },
+  g: { text: "ɡ", },
+  "voiced-uvular-stop": { text: "ɢ", },
+  "pharyngeal-stop": { text: "ʡ", },
+  "glottal-stop": { text: "ʔ", },
+
+  // nasals
+  "labiodental-nasal": { text: "ɱ", },
+  nr: { text: "ɳ", },
+  nj: { text: "ɲ", },
+  ng: { text: "ŋ", },
+  nq: { text: "ɴ", },
+
+  // trills and tap/flaps
+  "bilabial-trill": { text: "ʙ", },
+  "uvular-trill": { text: "ʀ", },
+  "pharyngeal-trill": { text: "ʜ", },
+  "voiced-pharyngeal-trill": { text: "ʢ", },
+  "labiodental-tap": { text: "ⱱ", },
+  "coronal-tap": { text: "ɾ", },
+  "retroflex-tap": { text: "ɽ", },
+
+  // frivatives
+  ph: { text: "ɸ", },
+  bh: { text: "β", },
+  th: { text: "θ", },
+  dh: { text: "ð", },
+  sh: { text: "ʃ", },
+  zh: { text: "ʒ", },
+  sr: { text: "ʂ", },
+  zr: { text: "ʐ", },
+  "palatal-fricative": { text: "ç", },
+  "voiced-palatal-fricative": { text: "ʝ", },
+  gh: { text: "ɣ", },
+  "uvular-fricative": { text: "χ", },
+  "voiced-uvular-fricative": { text: "ʁ", },
+  "pharyngeal-fricative": { text: "ħ", },
+  "voiced-pharyngeal-fricative": { text: "ʕ", },
+  "voiced-h": { text: "ɦ", },
+
+  // lateral fricatives
+  lh: { text: "ɬ", },
+  lz: { text: "ɮ", },
+  lhr: { text: "ꞎ", },
+  lzr: { text: "𝼅", },
+  lhj: { text: "𝼆", },
+  "velar-lateral-fricative": { text: "𝼄", },
+
+  // approximants
+  "labiodental-approx": { text: "ʋ", },
+  "coronal-approx": { text: "ɹ", },
+  "retroflex-approx": { text: "ɻ", },
+  "velar-approx" : { text: "ɰ", },
+
+  // lateral approximants
+  lr: { text: "ɭ", },
+  lj: { text: "ʎ", },
+  "velar-lateral": { text: "ʟ", },
+
+}
+
+<!------ Firmware ------>
+
+var hardware = {}
+
+function resetCursor(loc) {
+  const out = hardware.output.element
+  if (loc === undefined) { loc = out.value.length }
+  out.selectionStart = out.selectionEnd = loc
+}
+
+<!------ Application ------>
+
+function initHardware() {
+  hardware.keyboard = {
+    element: document.getElementById("keyboard") // TODO assert this exists
+  }
+  hardware.output = {
+    element: document.getElementById("output") // TODO assert this exists
+  }
+
+  hardware.keyboard.keyClick = _live(document, "[data-key]", "click", function (evt) {
+    keyElem = this
+    evt.preventDefault()
+    evt.stopPropagation()
+
+    const keyName = keyElem.dataset.key
+    const out = hardware.output.element
+    const selection = {
+      before: out.value.slice(0, out.selectionStart),
+      selected: out.value.slice(out.selectionStart, out.selectionEnd),
+      after: out.value.slice(out.selectionEnd),
+      replacement: keeb[keyName]?.text || keyName,
+    }
+    // TODO there's so much suckiness here?
+    out.value = selection.before + selection.replacement + selection.after
+    resetCursor(selection.before.length + selection.replacement.length)
+  })
+
+  // make sure if the input isn't focused, then the input will go to the end
+  resetCursor()
+  hardware.output.element.addEventListener("blur", function (evt) { resetCursor() })
+  // focus is normally taken away before a click event, so squash that
+  hardware.keyboard.element.addEventListener("mousedown", function (evt) { evt.preventDefault() })
+
+  Object.freeze(hardware)
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  initHardware()
+})
+
+
+</script>
+</head>
+
+<!------------------>
+<!------ HTML ------>
+<!------------------>
+<body>
+
+  <div>
+    <input type=text id=output />
+  </div>
+
+  <div id=keyboard>
+    <table>
+      <tr>
+        <td><span data-key="m">m</td>
+        <td><span data-key="labiodental-nasal">ɱ</td>
+        <td colspan=3><span data-key="n">n</td>
+        <td><span data-key="nr">ɳ</td>
+        <td><span data-key="nj">ɲ</td>
+        <td><span data-key="ng">ŋ</td>
+        <td><span data-key="nq">ɴ</td>
+        <td></td>
+        <td></td>
+      <tr>
+        <td><span data-key="p">p <span data-key="b">b</td>
+        <td></td>
+        <td colspan=3><span data-key="t">t <span data-key="d">d</td>
+        <td><span data-key="tr">ʈ <span data-key="dr">ɖ</td>
+        <td><span data-key="c">c <span data-key="voiced-palatal-stop">ɟ</td>
+        <td><span data-key="k">k <span data-key="g">g</td>
+        <td><span data-key="q">q <span data-key="voiced-uvular-stop">ɢ</td>
+        <td><span data-key="pharyngeal-stop">ʡ</td>
+        <td><span data-key="glottal-stop">ʔ</td>
+      <tr>
+        <td><span data-key="ph">ɸ <span data-key="bh">β</td>
+        <td><span data-key="f">f <span data-key="v">v</td>
+        <td><span data-key="th">θ <span data-key="dh">ð</td>
+        <td><span data-key="s">s <span data-key="z">z</td>
+        <td><span data-key="sh">ʃ <span data-key="zh">ʒ</td>
+        <td><span data-key="sr">ʂ <span data-key="zr">ʐ</td>
+        <td><span data-key="palatal-fricative">ç <span data-key="voiced-palatal-fricative">ʝ</td>
+        <td><span data-key="x">x <span data-key="gh">ɣ</td>
+        <td><span data-key="uvular-fricative">χ <span data-key="voiced-uvular-fricative">ʁ</td>
+        <td><span data-key="pharyngeal-fricative">ħ <span data-key="voiced-pharyngeal-fricative">ʕ</td>
+        <td><span data-key="h">h <span data-key="voiced-h">ɦ</td>
+      <tr>
+        <td></td>
+        <td><span data-key="labiodental-approx">ʋ</td>
+        <td colspan=3><span data-key="coronal-approx">ɹ</td>
+        <td><span data-key="retroflex-approx">ɻ</td>
+        <td><span data-key="j">j</td>
+        <td><span data-key="velar-approx">ɰ</td>
+        <td></td>
+        <td></td>
+        <td></td>
+      <tr>
+        <td><span data-key="bilabial-trill">ʙ</td>
+        <td><span data-key="labiodental-tap">ⱱ</td>
+        <td colspan=3><span data-key="coronal-tap">ɾ <span data-key="r">r</td>
+        <td><span data-key="retroflex-tap">ɽ</td>
+        <td></td>
+        <td></td>
+        <td><span data-key="uvular-trill">ʀ</td>
+        <td><span data-key="pharyngeal-trill">ʜ <span data-key="voiced-pharyngeal-trill">ʢ</td>
+        <td></td>
+      <tr>
+        <td></td>
+        <td></td>
+        <td colspan=3><span data-key="lh">ɬ <span data-key="lz">ɮ <span data-key="l">l</td>
+        <td><span data-key="lhr">ꞎ <span data-key="lr">ɭ</td>
+        <!-- <td><span data-key="lhr">ꞎ <span data-key="lzr">𝼅 <span data-key="lr">ɭ</td> -->
+        <td> <span data-key="lj">ʎ</td>
+        <!-- <td><span data-key="lhj">𝼆 <span data-key="lj">ʎ</td> -->
+        <td> <span data-key="velar-lateral">ʟ</td>
+        <!-- <td><span data-key="velar-lateral-fricative">𝼄 <span data-key="velar-lateral">ʟ</td> -->
+        <td></td>
+        <td></td>
+        <td></td>
+    </table>
+
+    <table>
+    <!-- TODO these data-keys are awful -->
+      <tr>
+        <td><span data-key="i">i <span data-key="y">y</td>
+        <td></td>
+        <td><span data-key="ɨ">ɨ <span data-key="ʉ">ʉ</td>
+        <td></td>
+        <td><span data-key="ɯ">ɯ <span data-key="u">u</td>
+      <tr>
+        <td></td>
+        <td><span data-key="ɪ">ɪ <span data-key="ʏ">ʏ</td>
+        <td></td>
+        <td><span data-key="ʊ">ʊ</td>
+        <td></td>
+      <tr>
+        <td><span data-key="e">e <span data-key="ø">ø</td>
+        <td></td>
+        <td><span data-key="ɘ">ɘ <span data-key="ɵ">ɵ</td>
+        <td></td>
+        <td><span data-key="ɤ">ɤ <span data-key="o">o</td>
+      <tr>
+        <td></td>
+        <td></td>
+        <td><span data-key="ə">ə</td>
+        <td></td>
+        <td></td>
+      <tr>
+        <td><span data-key="ɛ">ɛ <span data-key="œ">œ</td>
+        <td></td>
+        <td><span data-key="ɜ">ɜ <span data-key="ɞ">ɞ</td>
+        <td></td>
+        <td><span data-key="ʌ">ʌ <span data-key="ɔ">ɔ</td>
+      <tr>
+        <td><span data-key="æ">æ</td>
+        <td></td>
+        <td><span data-key="ɐ">ɐ</td>
+        <td></td>
+        <td></td>
+      <tr>
+        <td><span data-key="a">a <span data-key="ɶ">ɶ</td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td><span data-key="ɑ">ɑ <span data-key="ɒ">ɒ</td>
+    </table>
+  </div>
+
+</body>
+</html>

@@ -19,7 +19,11 @@ build:
     printf >&2 "OK %s --> %s\n" "build/$html" "docs/$html"
     mv "build/$html" "docs/$html"
   done
-  # TODO remove html files that don't have corresponding md
+  # raw html files
+  for html in src/*.html; do
+    cp "src/$html" "docs/$html"
+  done
+  # TODO remove html files that don't have corresponding sources
 
 clean:
   rm -f docs/*.html
