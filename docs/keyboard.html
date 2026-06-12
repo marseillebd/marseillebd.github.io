@@ -159,7 +159,7 @@ function initHardware() {
       before: out.value.slice(0, out.selectionStart),
       selected: out.value.slice(out.selectionStart, out.selectionEnd),
       after: out.value.slice(out.selectionEnd),
-      replacement: keeb[keyName]?.text || keyName,
+      replacement: keyName,
     }
     // TODO there's so much suckiness here?
     out.value = selection.before + selection.replacement + selection.after
