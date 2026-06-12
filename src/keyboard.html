@@ -8,9 +8,14 @@
 <!---------------->
 
 <style>
-@import url('ancient-sans-font/misc/Ancientsans-Jp9Pn.ttf');
-body {
-  font-family: "Ancient Sans", monospace;
+body, textarea {
+  font-size: 5vmin;
+  font-family: sans;
+}
+
+#output {
+  margin: 1rem;
+  width: 80vw;
 }
 </style>
 
@@ -177,7 +182,7 @@ document.addEventListener("DOMContentLoaded", () => {
 <body>
 
   <div>
-    <input type=text id=output />
+    <textarea id=output></textarea>
   </div>
 
   <div id=keyboard>
