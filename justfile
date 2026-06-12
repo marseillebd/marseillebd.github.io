@@ -21,6 +21,7 @@ build:
   done
   # raw html files
   for html in src/*.html; do
+    html="$(basename "$html")"
     cp "src/$html" "docs/$html"
   done
   # TODO remove html files that don't have corresponding sources
