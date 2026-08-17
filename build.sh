@@ -1,12 +1,32 @@
-# https://just.systems
+#!/usr/bin/env bash
+set -euo pipefail
 
+cd "$(dirname "$0")"
 
-default: build
+usage() {
+  cat >&2 <<USAGE
+Usage: $0 [build|clean]
+  build (default): build markdown and html sources into docs/
+  clean:          remove generated html files in docs/ and build/
+USAGE
+  exit 64
+}
 
-build:
-  #!/usr/bin/env bash
-  set -euo pipefail
+action="${1:-build}"
+case "$action" in
+  build|clean) ;;
+  -h|--help) usage ;;
+  *) usage ;;
+esac
+
+clean() {
+  rm -f docs/*.html
+  rm -f build/*.html
+}
+
+build() {
   typos src/*.md
+
   for md in src/*.md; do
     html="$(basename "${md%.md}.html")"
     # TODO skip building html that is newer than the corresponding md
@@ -19,13 +39,17 @@ build:
     printf >&2 "OK %s --> %s\n" "build/$html" "docs/$html"
     mv "build/$html" "docs/$html"
   done
+
   # raw html files
   for html in src/*.html; do
     html="$(basename "$html")"
     cp "src/$html" "docs/$html"
   done
-  # TODO remove html files that don't have corresponding sources
 
-clean:
-  rm -f docs/*.html
-  rm -f build/*.html
+  # TODO remove html files that don't have corresponding sources
+}
+
+case "$action" in
+  build) build ;;
+  clean) clean ;;
+esac
