@@ -9,13 +9,13 @@ Usage: $0 [build|clean]
   build (default): build markdown and html sources into docs/
   clean:          remove generated html files in docs/ and build/
 USAGE
-  exit 64
+  exit "${1:-64}"
 }
 
 action="${1:-build}"
 case "$action" in
   build|clean) ;;
-  -h|--help) usage ;;
+  -\?|--help) usage 0 ;;
   *) usage ;;
 esac
 
@@ -28,16 +28,16 @@ build() {
   typos src/*.md
 
   for md in src/*.md; do
-    html="$(basename "${md%.md}.html")"
-    # TODO skip building html that is newer than the corresponding md
+    local name html
+    name="$(basename "$md" .md)"
+    html="$name.html"
     printf >&2 "building %s --> %s\n" "$md" "build/$html"
     pandoc \
       --lua-filter="assets/meta-from-md.lua" \
       --template="assets/page.html" \
       --from=gfm+footnotes \
       "$md" -o "build/$html"
-    printf >&2 "OK %s --> %s\n" "build/$html" "docs/$html"
-    mv "build/$html" "docs/$html"
+    mv -v "build/$html" "docs/$html"
   done
 
   # raw html files
