@@ -1,6 +1,7 @@
-function Pandoc (doc)
-  doc.meta.date_meta = os.date("%Y-%m-%d") -- for use in html `meta name=date`
-  doc.meta.date = os.date("%d %B 1%Y HE"):gsub("^0*", "", 1) -- human date format for the footer
+function Pandoc(doc)
+  local mtime = tonumber(doc.meta.mtime)
+  doc.meta.date_meta = os.date("%Y-%m-%d", mtime) -- for use in html `meta name=date`
+  doc.meta.date = os.date("%d %B 1%Y HE", mtime):gsub("^0*", "", 1) -- human date format for the footer
   doc.blocks:walk {
     Header = function (h)
       -- use top-level heading as title, unless the doc
@@ -13,4 +14,3 @@ function Pandoc (doc)
   }
   return doc
 end
-

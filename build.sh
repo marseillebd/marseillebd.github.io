@@ -34,6 +34,7 @@ build() {
     printf >&2 "building %s --> %s\n" "$md" "build/$html"
     pandoc \
       --lua-filter="assets/meta-from-md.lua" \
+      --metadata="mtime:$(git log -1 --format=%ct -- "$md" 2>/dev/null || date -r "$md" +%s)" \
       --template="assets/page.html" \
       --from=gfm+footnotes \
       "$md" -o "build/$html"
