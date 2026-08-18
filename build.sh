@@ -7,7 +7,7 @@ usage() {
   cat >&2 <<USAGE
 Usage: $0 [build|clean]
   build (default): build markdown and html sources into docs/
-  clean:          remove generated html files in docs/ and build/
+  clean:          remove generated html files in docs/ and .build/
 USAGE
   exit "${1:-64}"
 }
@@ -21,7 +21,7 @@ esac
 
 clean() {
   rm -f docs/*.html
-  rm -f build/*.html
+  rm -f .build/*.html
 }
 
 build() {
@@ -31,14 +31,14 @@ build() {
     local name html
     name="$(basename "$md" .md)"
     html="$name.html"
-    printf >&2 "building %s --> %s\n" "$md" "build/$html"
+    printf >&2 "building %s --> %s\n" "$md" ".build/$html"
     pandoc \
       --lua-filter="assets/meta-from-md.lua" \
       --metadata="mtime:$(git log -1 --format=%ct -- "$md" 2>/dev/null || date -r "$md" +%s)" \
       --template="assets/page.html" \
       --from=gfm+footnotes \
-      "$md" -o "build/$html"
-    mv -v "build/$html" "docs/$html"
+      "$md" -o ".build/$html"
+    mv -v ".build/$html" "docs/$html"
   done
 
   # raw html files
