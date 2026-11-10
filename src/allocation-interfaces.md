@@ -1,5 +1,17 @@
 # An Informal Type-Theoretic Analysis of Interfaces for Resource Acquisition and Release
 
+Since writing the draft of this article, my thoughts have matured.
+tl;dr:
+- once you choose manual or automatic memory management, you are basically locked-in, which hurts the ability of programs to evolve
+- one _could_ develop a reasonably safe interface for embedding garbage collection into a manually-managed language, but the result doesn't actually save you much
+- embedding manual memory management into a garbage-collected language is nearly solved: just follow the existing interface for managing, say, files of database connections
+- therefore, start with garbage collection, and use foreign pointers if/when allocation overhead become problematic
+- or in other words, garbage collection is semantically more foundational than manual collection
+
+I've not updated the rest since it was a draft, but you can read it if you want to follow the same chain of complexity that I did.
+
+------------------------------------
+
 Despite the pretentious title, I'm really talking about manual memory management vs garbage collection.
 The lessons learned in memory management do apply to other forms of resources, though, such as locks or database connections or VBAs and so on.
 

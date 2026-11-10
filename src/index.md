@@ -10,8 +10,10 @@ Some of my work is listed under my deadname; contact me privately if you need it
 
 ## Articles
 
-[Compiler Tools](./compiler-tools.html)
-[An Informal Type-Theoretic Analysis of Interfaces for Resource Acquisition and Release](./allocation-interfaces.html)
+- [How (Not) to Write Documentation](./documentation.html)
+- [Self-Documenting Code](./self-documenting-code.html)
+- [Compiler Tools](./compiler-tools.html)
+- [Allocation Interfaces](./allocation-interfaces.html)
 
 ## Random Tools
 
